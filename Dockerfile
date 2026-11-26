@@ -1,12 +1,10 @@
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONUTF8=1 \
-    PIP_NO_CACHE_DIR=1
+    PYTHONUTF8=1
 
 WORKDIR /app
 
-# Audio decoding and sound-file runtime libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
@@ -14,8 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . .
 
-RUN python -m pip install --upgrade pip \
-    && python -m pip install ".[gui,render,transcribe]"
+# Follow the original README setup: CPU core environment (GUI + transcription + conversion + rendering).
+RUN python scripts/setup_core.py
 
-# Render supplies PORT. Keep the original local defaults unchanged in server.py.
-CMD ["sh", "-c", "export MUSICMASTER_HOST=0.0.0.0; export MUSICMASTER_PORT=${PORT:-10000}; exec python -m musicmaster.web.server"]
+# Same application entry point as the original launcher; only bind to Render's public port.
+CMD ["sh", "-c", "MUSICMASTER_HOST=0.0.0.0 MUSICMASTER_PORT=${PORT:-10000} .venv/bin/python -m musicmaster.web.server"]
