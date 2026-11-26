@@ -40,8 +40,9 @@ def main():
     run("install", "-U", "pip")
     print("[3/5] 装 TensorFlow(CREPE/basic-pitch 后端)")
     run("install", "tensorflow==2.15.0")  # 固定 2.15.0:唯一同时满足 basic-pitch(<2.15.1)与 crepe 的版本
-    print("[4/5] 装 crepe(--no-deps,保 TF 不被降级)")
-    run("install", "--no-deps", "crepe")
+    print("[4/5] 装 crepe(保留 TF 版本，并使用已安装的 setuptools 构建)")
+    run("install", "setuptools<81")
+    run("install", "--no-build-isolation", "--no-deps", "crepe")
     print("[5/5] 装 requirements-core + 本包")
     run("install", "-r", str(ROOT / "requirements" / "requirements-core.txt"))
     run("install", "-e", str(ROOT))
