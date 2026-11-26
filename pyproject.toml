@@ -17,6 +17,7 @@ keywords = [
 
 # 基础(CPU):契约 + 互转 + 谱面渲染 + engine 人声 pyin 路径所需的最小集合。
 dependencies = [
+  "requests>=2.31",
   "numpy>=1.24,<2",
   "scipy>=1.10",
   "librosa>=0.10",
