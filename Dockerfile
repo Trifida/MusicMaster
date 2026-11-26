@@ -12,10 +12,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . .
 
-# Keep pkg_resources available for CREPE's legacy build backend.
-RUN printf 'setuptools<81\n' > /tmp/pip-constraints.txt
-ENV PIP_CONSTRAINT=/tmp/pip-constraints.txt
-
 # Follow the original README setup: CPU core environment (GUI + transcription + conversion + rendering).
 RUN python scripts/setup_core.py
 
