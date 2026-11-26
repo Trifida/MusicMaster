@@ -314,6 +314,75 @@ def run_transcribe(job, audio_path: str, engine: str = "crepe", key: str = "") -
                 "spots": None, "downloads": [],
                 "message": f"未知引擎「{engine}」,可选:{', '.join(_engines)}。"}
     d = Path(job.job_dir)
+
+    # Render 网站不加载 TensorFlow；Basic Pitch 复音识别交给独立 Colab CPU Worker。
+    # CREPE / ByteDance 原有路径保持不变，前端仍使用同一个 /api/transcribe 任务接口。
+    if engine == "basic-pitch" and os.getenv("BASIC_PITCH_API_URL", "").strip():
+        try:
+            from musicmaster.web.basic_pitch_remote import (
+                transcribe_remote,
+                target_to_polyphonic_musicxml,
+            )
+
+            target = transcribe_remote(job, audio_path, d)
+            job.set_stage("CPU 音符已返回，正在生成复音 MusicXML…", 0.82)
+            mxl = target_to_polyphonic_musicxml(
+                target, d / "out.musicxml", key_name=key
+            )
+
+            staff_svg = None
+            render_warning = ""
+            try:
+                from musicmaster.core.render import render as render_score
+                rr = render_score(str(mxl), str(d), formats=("staff",))
+                staff_svg = _read_svg(Path(rr["staff"])) if rr.get("staff") else None
+            except Exception as render_exc:  # 谱面渲染失败不丢失 MIDI / 音符结果
+                render_warning = (
+                    f"\\n\\n五线谱预览暂未生成：{type(render_exc).__name__}: "
+                    f"{str(render_exc)[:180]}"
+                )
+
+            report = (
+                "# Basic Pitch 云端 CPU 扒谱报告\\n\\n"
+                f"> 源文件：{Path(audio_path).name}  引擎：Basic Pitch 0.4.0（Google Colab CPU）\\n\\n"
+                "## 识别结果\\n"
+                f"- 音符事件：{len(target['notes'])}\\n"
+                f"- 估计速度：{target.get('tempo', 120):.1f} BPM\\n"
+                "- 计算方式：Render 负责任务管理，Google Colab CPU 负责模型推理。\\n\\n"
+                "## 结果说明\\n"
+                "- 此引擎用于复音、和弦及乐器音频；同时发声的音符会按和弦/多声部方式排入五线谱。\\n"
+                "- MIDI 与 notes.json 保留秒级音符起止时间；MusicXML 为便于阅读会量化到八分音符栅格。\\n"
+                "- 当前复音路径不生成单旋律简谱和逐音可信度报告。"
+                + render_warning
+            )
+            downloads = _downloads(
+                d, only=["notes.json", "out.mid", "out.musicxml", "staff.svg"]
+            )
+            if not downloads:
+                downloads = _downloads(d)
+            return {
+                "ok": True,
+                "report_md": report,
+                "staff_svg": staff_svg,
+                "confidence_pct": None,
+                "spots": None,
+                "downloads": downloads,
+            }
+        except Exception as e:  # 远程服务失败时向现有工作台返回可读错误
+            return {
+                "ok": False,
+                "report_md": (
+                    "# Basic Pitch 云端 CPU 扒谱未完成\\n\\n"
+                    f"{type(e).__name__}: {str(e)[:500]}\\n\\n"
+                    "请确认 Colab CPU Worker 正在运行，然后重试。"
+                ),
+                "staff_svg": None,
+                "confidence_pct": None,
+                "spots": None,
+                "downloads": _downloads(d),
+                "message": f"Basic Pitch 云端计算失败：{type(e).__name__}: {str(e)[:240]}",
+            }
+
     stop = threading.Event()
     # autopilot.main 是一次阻塞调用、内部 stdout 不易按 job 截获 → 改用文件里程碑推断真实进度
     milestones = [
