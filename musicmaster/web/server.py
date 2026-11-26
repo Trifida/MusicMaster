@@ -35,7 +35,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
 
 REPO = Path(__file__).resolve().parents[2]
-OUTPUT = REPO / "output"
+OUTPUT = Path(os.environ.get("MUSICMASTER_OUTPUT_DIR", str(REPO / "output"))).expanduser()
 STATIC = Path(__file__).resolve().parent / "static"
 UPLOADS = OUTPUT / "_uploads"
 
